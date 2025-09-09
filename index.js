@@ -41,7 +41,7 @@ async function handleRequest(request) {
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${GEMINI_API_KEY}`,
+          "Authorization": "AIzaSyCxO6fzWuvl9RKhth89kqU_QshJIdjmEec",
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
