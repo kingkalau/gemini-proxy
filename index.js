@@ -4,47 +4,39 @@ addEventListener("fetch", event => {
 
 async function handleRequest(request) {
   try {
-    // GET 測試用
-    if (request.method === "GET") {
-      return new Response(
-        JSON.stringify({ message: "Worker is running. Use POST with JSON body." }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )
-    }
+    let prompt
 
-    // 僅接受 POST
-    if (request.method !== "POST") {
+    if (request.method === "GET") {
+      const url = new URL(request.url)
+      prompt = url.searchParams.get("prompt")
+      if (!prompt) {
+        return new Response(
+          JSON.stringify({ error: "Missing 'prompt' in query string" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        )
+      }
+    } else if (request.method === "POST") {
+      let body
+      try { body = await request.json() } 
+      catch { body = {} }
+
+      prompt = body.prompt
+      if (!prompt) {
+        return new Response(
+          JSON.stringify({ error: "Missing 'prompt' in request body" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        )
+      }
+    } else {
       return new Response(
-        JSON.stringify({ error: "Only POST allowed" }),
+        JSON.stringify({ error: "Only GET or POST allowed" }),
         { status: 405, headers: { "Content-Type": "application/json" } }
       )
     }
 
-    // 解析 JSON body
-    let body
-    try {
-      body = await request.json()
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON body" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      )
-    }
+    const model = (request.method === "POST" && body.model) || "gemini-2.5-pro"
+    const API_KEY = await SECRET_API_KEY // Cloudflare Secret
 
-    const prompt = body.prompt
-    const model = body.model || "gemini-2.5-pro"
-
-    if (!prompt) {
-      return new Response(
-        JSON.stringify({ error: "Missing 'prompt' in request body" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      )
-    }
-
-    // 讀 Cloudflare Secret
-    const API_KEY = await SECRET_API_KEY // 你必須在 Cloudflare Worker 設定 secret
-
-    // 呼叫 Gemini API
     const apiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
@@ -59,7 +51,6 @@ async function handleRequest(request) {
 
     const data = await apiResponse.json()
 
-    // 模擬 OpenRouter API 回傳格式
     const responsePayload = {
       id: data.name || "response-id",
       object: "text_completion",
@@ -74,9 +65,9 @@ async function handleRequest(request) {
     })
 
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    )
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    })
   }
 }
